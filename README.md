@@ -8,12 +8,18 @@ I'm currently expanding into offensive-security fundamentals through hands-on pr
 
 Core Tools & Skills
 
-SIEM: Microsoft Sentinel, Sumo Logic, Sekoia,
-EDR: SentinelOne, Microsoft Defender for Endpoint,
-Security Tools: VirusTotal, Any.Run, AlienVault OTX, Censys, Burp Suite,
-Scripting: Python, KQL,
-Frameworks: MITRE ATT&CK, GDPR, HIPAA,
+SIEM: Microsoft Sentinel, Sumo Logic, Sekoia
+
+EDR: SentinelOne, Microsoft Defender for Endpoint
+
+Security Tools: VirusTotal, Any.Run, AlienVault OTX, Censys, Burp Suite
+
+Scripting: Python, KQL
+
+Frameworks: MITRE ATT&CK, GDPR, HIPAA
+
 Certifications: Certified Ethical Hacker (CEH), Fortinet Certified Associate, Cloud SIEM Administration (Sumo Logic), Foundation of Operationalizing MITRE ATT&CK v13
+
 
 **Repository Structure**
 
@@ -40,6 +46,6 @@ Folder	Contents:
 
 
 
-Note on Content
+**Note on Content**
 
 All write-ups in this repository are generalized and anonymized — built from real SOC methodology and tools I use day-to-day, but with no employer-specific data, real incident details, or proprietary information. They're meant to demonstrate how I approach detection, investigation, and response, not to reproduce confidential work.
