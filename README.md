@@ -2,6 +2,7 @@
 Fabina AT — 4+ years of SOC experience | SIEM & Detection Engineering | Incident Response | Threat Hunting | Cloud Security | Vulnerability Management | SOAR & Security Automation | MITRE ATT&CK
 
 **About**
+
 I've spent the last 4 years working SOC Analyst L1 roles in 24/7 shift environments — monitoring enterprise networks, triaging and responding to security incidents (100+ confirmed to date), tuning SIEM detection rules, and building automation to cut manual triage work. This repository is a working portfolio of that experience: detection engineering, incident investigations, threat hunts, playbooks, and automation, written up in a generalized form that demonstrates real methodology without exposing employer-specific data.
 I'm currently expanding into offensive-security fundamentals through hands-on practice on TryHackMe, Hack The Box, and OverTheWire, working toward a stronger blend of blue-team and red-team perspective.
 
