@@ -1,114 +1,42 @@
 # Brute-Force Authentication Detection
 
-## 1. Detection Overview
+## 1. Detection Summary
 
-This detection identifies potential brute-force authentication activity by detecting multiple failed authentication attempts from the same source against one or more user accounts within a defined time window.
+**Use Case:** Brute-Force Authentication
 
-The detection is designed from a SOC detection-engineering perspective and can be adapted for SIEM platforms such as Microsoft Sentinel and Splunk.
+**Platform:** Microsoft Sentinel
+
+**Data Source:** Microsoft Entra ID (`SigninLogs`)
+
+**Severity:** Medium
+
+**MITRE ATT&CK:** T1110 – Brute Force
+
+### Description
+
+Detects repeated failed authentication attempts against a user account within a short time period. The detection helps identify potential password-guessing activity and possible account compromise.
 
 ---
 
-## 2. Threat Scenario
+## 2. Detection Logic
 
-An attacker may repeatedly attempt different passwords against a user account to gain unauthorized access.
-
-Typical attack flow:
+**Threshold:** 10+ failed sign-in attempts within 10 minutes for the same user.
 
 ```text
-Attacker
-   |
-   | Multiple authentication attempts
-   v
-Authentication Service
-   |
-   | Failed logins
-   v
-SIEM
-   |
-   | Correlation / Threshold
-   v
-SOC Alert
-   |
-   v
-Analyst Investigation
+Failed Sign-ins
+      ↓
+Group by User
+      ↓
+10+ Attempts / 10 Minutes
+      ↓
+Generate Alert
+      ↓
+SOC Investigation
 ```
 
-A successful authentication following a high volume of failures may indicate potential account compromise and should be investigated.
-
 ---
 
-## 3. Detection Objective
-
-The objective is to identify:
-
-* Repeated failed authentication attempts
-* Password brute-force activity
-* Automated credential attacks
-* Potential account compromise attempts
-* Suspicious authentication sources
-
----
-
-## 4. Detection Logic
-
-The detection identifies:
-
-> Multiple failed authentication attempts from the same source IP against the same user within a defined time window.
-
-Example detection condition:
-
-```text
-Failed authentication attempts >= 10
-AND
-Time window = 10 minutes
-AND
-Same source IP
-AND
-Same username
-```
-
-The threshold should be tuned according to the organization's normal authentication behavior.
-
----
-
-## 5. Data Sources
-
-Potential telemetry sources include:
-
-* Windows Security Events
-* Microsoft Entra ID
-* Active Directory
-* VPN authentication logs
-* Identity Provider logs
-* Microsoft Defender
-* EDR telemetry
-* SIEM authentication events
-
----
-
-## 6. Required Log Fields
-
-The detection should ideally contain:
-
-| Field                 | Description                       |
-| --------------------- | --------------------------------- |
-| Timestamp             | Time of authentication attempt    |
-| Username              | Target user account               |
-| Source IP             | Originating IP address            |
-| Destination           | Target system/service             |
-| Authentication Result | Success or failure                |
-| Authentication Method | Password, MFA, certificate, etc.  |
-| Device Name           | Source device                     |
-| Failure Reason        | Reason for authentication failure |
-| Source Location       | Geographic location               |
-| ASN                   | Network/provider information      |
-| User Agent            | Client/application information    |
-
----
-
-# 7. Microsoft Sentinel – KQL
-
-The following example detects repeated failed authentication events.
+## 3. KQL Detection
 
 ```kql
 SigninLogs
@@ -118,26 +46,69 @@ SigninLogs
     FailedAttempts = count(),
     FirstAttempt = min(TimeGenerated),
     LastAttempt = max(TimeGenerated),
-    SourceIPs = make_set(IPAddress, 10),
-    Applications = make_set(AppDisplayName, 10)
+    SourceIPs = make_set(IPAddress, 10)
     by UserPrincipalName
 | where FailedAttempts >= 10
-| project
-    UserPrincipalName,
-    FailedAttempts,
-    FirstAttempt,
-    LastAttempt,
-    SourceIPs,
-    Applications
+| project UserPrincipalName, FailedAttempts,
+          FirstAttempt, LastAttempt, SourceIPs
 | order by FailedAttempts desc
 ```
 
-### KQL Logic
+---
 
-The query:
+## 4. Investigation
 
-1. Looks at the last 10 minutes.
-2. Filters unsuccessful sign-ins.
-3. Groups events by user.
-4. Counts failed authentication att
+When the alert triggers, the analyst reviews:
+
+* Targeted user and account type
+* Source IP and reputation
+* Authentication location
+* Number and timing of failed attempts
+* Applications being accessed
+* Successful login following failures
+* Related endpoint or cloud activity
+
+A successful authentication following repeated failures should be investigated for possible account compromise.
+
+---
+
+## 5. False Positives & Tuning
+
+Common false positives include:
+
+* Incorrect passwords
+* Expired credentials
+* VPN issues
+* Service accounts
+* Application authentication failures
+
+Tuning may include adjusting the threshold, excluding approved infrastructure, and separating service-account activity.
+
+---
+
+## 6. Response
+
+If malicious activity is confirmed:
+
+1. Investigate the source IP and affected account.
+2. Review successful authentication and subsequent activity.
+3. Reset credentials if compromise is confirmed.
+4. Revoke sessions where appropriate.
+5. Escalate according to the incident-response process.
+
+---
+
+## 7. Validation
+
+The detection should be tested using controlled failed authentication attempts to verify:
+
+* Required logs are collected
+* Detection triggers at the defined threshold
+* Alert contains sufficient investigation context
+* Legitimate authentication activity does not create excessive alerts
+
+---
+
+**Detection Status:** Ready for testing and tuning.
+
 
