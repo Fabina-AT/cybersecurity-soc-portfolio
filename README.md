@@ -9,6 +9,7 @@ I'm currently expanding into offensive-security fundamentals through hands-on pr
 Core Tools & Skills
 
 SIEM: Microsoft Sentinel, Sumo Logic, Sekoia
+
 EDR: SentinelOne, Microsoft Defender for Endpoint
 
 Security Tools: VirusTotal, Any.Run, AlienVault OTX, Censys, Burp Suite
