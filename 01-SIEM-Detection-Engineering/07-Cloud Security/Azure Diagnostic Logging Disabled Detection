@@ -1,0 +1,67 @@
+# Azure Diagnostic Logging Disabled Detection
+
+## 1. Overview
+Detects when Azure diagnostic settings are deleted or modified to stop sending logs to a Log Analytics workspace or other monitoring destination. Attackers may do this to hide malicious activity.
+
+## 2. Data Sources
+- Microsoft Sentinel
+- Azure Activity Logs
+- Azure Monitor diagnostic settings activity
+
+## 3. Detection Logic
+Monitor successful administrative operations that delete diagnostic settings or modify their configuration.
+
+## 4. KQL Detection Query
+
+```kusto
+AzureActivity
+| where TimeGenerated > ago(24h)
+| where ActivityStatusValue =~ "Success"
+| where OperationNameValue has_any (
+    "MICROSOFT.INSIGHTS/DIAGNOSTICSETTINGS/DELETE",
+    "MICROSOFT.INSIGHTS/DIAGNOSTICSETTINGS/WRITE"
+)
+| project
+    TimeGenerated,
+    Caller,
+    OperationNameValue,
+    ResourceGroup,
+    ResourceId,
+    SubscriptionId,
+    CallerIpAddress,
+    ActivityStatusValue
+| order by TimeGenerated desc
+```
+
+## 5. MITRE ATT&CK
+- Tactic: Defense Evasion
+- Technique: T1562.008 – Disable or Modify Cloud Logs
+
+## 6. Investigation Steps
+1. Identify the user or service principal responsible.
+2. Determine which resource's diagnostic settings were changed.
+3. Check whether logs stopped reaching the expected destination.
+4. Review the caller's sign-in activity and source IP.
+5. Look for other suspicious administrative changes around the same time.
+
+## 7. False Positives
+- Approved monitoring configuration changes
+- Log Analytics workspace migrations
+- Planned cost optimization
+- Infrastructure-as-code deployments
+
+## 8. Response Actions
+- Confirm the change with the cloud operations team.
+- Restore the approved diagnostic settings.
+- Verify that log ingestion has resumed.
+- Investigate potentially compromised accounts.
+- Preserve available audit evidence and escalate if malicious activity is confirmed.
+
+## 9. Severity
+High when logging is disabled on critical resources without authorization; Medium for unverified changes with limited impact.
+
+## 10. Recommended Improvements
+- Alert separately on diagnostic setting deletion and modification.
+- Maintain a baseline of required logging destinations.
+- Monitor changes across subscriptions.
+- Verify that critical resources continue sending logs to Microsoft Sentinel.
