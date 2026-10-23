@@ -79,4 +79,32 @@ The behaviour matched ransomware: shadow copies were deleted first, then more th
 - Blocked the file hash, domain and IP, and purged the email from other mailboxes.
 - Confirmed backups were not affected, then restored the encrypted share folder from backup.
 - Rebuilt the laptop from a clean image before returning it to the user.
-- Monitored the user's account and the file server for 7
+- Monitored the user's account and the file server for 7 days.
+
+Outcome
+
+Status: Contained, files restored from backup
+
+Evidence: EDR process tree, file event logs, email logs, sandbox report and backup restore record
+
+Lessons Learned
+
+The speed of isolation limited the damage. Recommend a high-severity detection on shadow copy deletion, least-privilege access on shared folders, immutable offline backups, and attack surface reduction rules to block executable content from email. Run a restore test on a regular schedule so recovery time is known.
+
+IOCs
+
+File: Invoice_Payment.zip - phishing attachment
+
+SHA256: <sha256-of-ransomware-sample> - replace with the hash from your lab
+
+Extension: .locked2026 - appended to encrypted files
+
+File: README_RESTORE.txt - ransom note
+
+IP: 203.0.113.99 - external host contacted
+
+Command: vssadmin delete shadows /all /quiet - recovery tampering
+
+Portfolio Note
+
+This is a simulated case study. Replace the figures, times and findings with verified results from your lab before presenting it as a completed investigation.
