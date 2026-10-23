@@ -104,7 +104,7 @@ Any process outside the approved security tools that opens LSASS should be treat
 - **Process:** Unsigned executable in the user's Temp folder - accessed LSASS memory
 - **File:** `lsass.dmp` - memory dump created on the host
 - **IP:** `203.0.113.150` - destination of the dump file
-  - **SHA256:** `<sha256-of-executable>` - replace with the hash from your lab
+  - **SHA256:** `<sha256-of-executable>` 
 
 ## Portfolio Note
 
