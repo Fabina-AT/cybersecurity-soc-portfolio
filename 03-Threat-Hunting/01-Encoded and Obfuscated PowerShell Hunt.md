@@ -1,126 +1,151 @@
-# Encoded and Obfuscated PowerShell Hunt
+# Hunt 1: Suspicious PowerShell Execution
 
-## Hunt Details
+## Hunt Objective
 
-* Type: Lab simulation
-* Priority: High
-* MITRE ATT&CK Tactics: Execution, Defense Evasion
-* MITRE ATT&CK Techniques:
-  * T1059.001 - Command and Scripting Interpreter: PowerShell (Execution)
-  * T1027 - Obfuscated Files or Information (Defense Evasion)
-  * T1105 - Ingress Tool Transfer (Command and Control)
-* Attack Stage: Execution and Defense Evasion
+Identify suspicious PowerShell execution, unusual parent-child process relationships, and external network connections that may indicate malware execution, payload downloads, or command-and-control activity.
 
-## Hunt Hypothesis
+## Hunting Hypothesis
 
-Attackers use PowerShell with encoded commands, hidden windows and download-and-run patterns to run code without writing files to disk. If this is happening in the environment, it will show up as PowerShell processes with unusual command-line flags, launched by unexpected parent processes, on hosts where PowerShell is not normally used.
+Attackers may abuse PowerShell to execute encoded commands, download malicious payloads, communicate with external servers, or launch scripts through unusual parent processes.
 
 ## Data Sources
 
-* Microsoft Defender for Endpoint (DeviceProcessEvents, DeviceNetworkEvents)
-* PowerShell script block logging (Event ID 4104), if enabled
-* Sysmon process creation events (Event ID 1), if deployed
-* Threat intelligence (VirusTotal, AlienVault OTX)
+- Microsoft Defender for Endpoint
+- Microsoft Sentinel
+- Sysmon (Event ID 1 – Process Creation, Event ID 3 – Network Connection)
+- Windows Security Events (Event ID 4688)
 
-## Hunting Steps
+## 1. Encoded and Obfuscated PowerShell Execution
 
-1. Find PowerShell processes with encoded, hidden or bypass flags.
-2. Decode the Base64 command lines and read what they do.
-3. Check which parent process launched PowerShell.
-4. Check network connections made by the same process.
-5. Compare against a baseline of normal PowerShell use per host and per user.
-6. Filter out known administrative tools and scripts.
-7. Investigate what remains.
+Hunt for encoded commands, hidden windows, execution policy bypass, and suspicious scripting methods.
 
-### Hunting Queries
-
-Encoded, hidden or bypass PowerShell:
+**Microsoft Sentinel – KQL**
 
 ```kql
 DeviceProcessEvents
-| where Timestamp > ago(30d)
+| where Timestamp > ago(7d)
 | where FileName in~ ("powershell.exe", "pwsh.exe")
-| where ProcessCommandLine has_any ("-enc", "-encodedcommand", "-e ", "-w hidden", "-windowstyle hidden", "-nop", "-noprofile", "bypass")
-| project Timestamp, DeviceName, AccountName, InitiatingProcessFileName, ProcessCommandLine
+| where ProcessCommandLine has_any (
+    "-EncodedCommand",
+    "-enc",
+    "-WindowStyle Hidden",
+    "-ExecutionPolicy Bypass",
+    "DownloadString",
+    "DownloadFile",
+    "FromBase64String",
+    "Invoke-Expression"
+)
+| project Timestamp, DeviceName, AccountName,
+          FileName, ProcessCommandLine,
+          InitiatingProcessFileName, SHA256
 | order by Timestamp desc
 ```
 
-Download-and-run patterns:
+## 2. External Connections from PowerShell
 
-```kql
-DeviceProcessEvents
-| where Timestamp > ago(30d)
-| where FileName in~ ("powershell.exe", "pwsh.exe")
-| where ProcessCommandLine has_any ("DownloadString", "DownloadFile", "Invoke-WebRequest", "iwr ", "Invoke-Expression", "IEX", "Net.WebClient")
-| project Timestamp, DeviceName, AccountName, InitiatingProcessFileName, ProcessCommandLine
-```
-
-Decode the Base64 command (Defender extracts it):
-
-```kql
-DeviceProcessEvents
-| where Timestamp > ago(30d)
-| where FileName =~ "powershell.exe"
-| where ProcessCommandLine has_any ("-enc", "-encodedcommand")
-| extend EncodedPart = extract(@"(?i)-e(?:nc|ncodedcommand)?\s+([A-Za-z0-9+/=]{20,})", 1, ProcessCommandLine)
-| where isnotempty(EncodedPart)
-| extend Decoded = base64_decode_tostring(EncodedPart)
-| project Timestamp, DeviceName, AccountName, Decoded
-```
-
-Rare parent processes launching PowerShell:
-
-```kql
-DeviceProcessEvents
-| where Timestamp > ago(30d)
-| where FileName =~ "powershell.exe"
-| summarize Launches = count(), Hosts = dcount(DeviceName) by InitiatingProcessFileName
-| where Launches < 10
-| order by Launches asc
-```
-
-Network connections from PowerShell:
+Hunt for PowerShell processes communicating with public IP addresses and external destinations.
 
 ```kql
 DeviceNetworkEvents
-| where Timestamp > ago(30d)
-| where InitiatingProcessFileName =~ "powershell.exe"
+| where Timestamp > ago(7d)
+| where InitiatingProcessFileName in~ (
+    "powershell.exe", "pwsh.exe"
+)
 | where RemoteIPType == "Public"
-| summarize Connections = count() by DeviceName, RemoteUrl, RemoteIP
-| order by Connections desc
+| project Timestamp, DeviceName,
+          InitiatingProcessAccountName,
+          InitiatingProcessFileName,
+          InitiatingProcessCommandLine,
+          RemoteIP, RemoteUrl, RemotePort,
+          Protocol
+| order by Timestamp desc
 ```
 
-## Baseline and Filtering
+**Investigation Focus**
 
-* Baseline: List which hosts and accounts run PowerShell normally over 30 days. IT admin hosts and management servers usually account for most of it.
-* Known-good to exclude: Software deployment tools, monitoring agents, scheduled admin scripts and the security tools that use encoded commands.
-* Keep for review: Standard user workstations running encoded or hidden PowerShell, and any PowerShell launched by Office, a browser or a script host.
+- Identify external IP addresses and domains.
+- Check destination reputation using VirusTotal.
+- Review connection frequency and timing.
+- Investigate possible payload downloads or data transfers.
+- Correlate network activity with PowerShell execution.
 
-## Analysis
+## 3. Unusual Parent Process Launching PowerShell
 
-Results were reviewed in three groups: encoded commands, download-and-run patterns and rare parent processes. Most results came from software deployment and monitoring tools and were added to the allowlist. Three results remained after filtering:
+Hunt for unexpected applications or processes launching PowerShell.
 
-* A finance workstation ran an encoded command launched by a Word process, which decoded to a download of a script from an external host.
-* An engineering laptop ran PowerShell with a hidden window and execution policy bypass launched from a user's Downloads folder.
-* A service account ran a Base64 command at an odd hour, which turned out to be an approved backup script.
+```kql
+DeviceProcessEvents
+| where Timestamp > ago(7d)
+| where FileName in~ ("powershell.exe", "pwsh.exe")
+| where InitiatingProcessFileName !in~ (
+    "explorer.exe",
+    "cmd.exe",
+    "services.exe",
+    "svchost.exe",
+    "powershell.exe",
+    "pwsh.exe"
+)
+| project Timestamp,
+          DeviceName,
+          AccountName,
+          InitiatingProcessFileName,
+          InitiatingProcessCommandLine,
+          FileName,
+          ProcessCommandLine,
+          SHA256
+| order by Timestamp desc
+```
 
-## Findings
+**Investigation Focus**
 
-Two of the three remaining results were suspicious and escalated, and one was benign. The finance workstation case matched a phishing-delivered macro and was handed to incident response as an investigation, in the same way as the malware execution case. The engineering laptop was a user running a downloaded script, which was a policy issue rather than an attack. The backup script was documented and added to the allowlist.
+- Identify the parent process launching PowerShell.
+- Review the parent process command line and file path.
+- Investigate Office applications, browsers, PDF readers, and script hosts.
+- Check whether the parent process is expected to launch PowerShell.
+- Correlate with network connections and subsequent process execution.
 
-## Outcome
+## MITRE ATT&CK Mapping
 
-Status: Suspicious activity found and escalated
-Evidence: Process events, decoded command lines and network connection logs
+- T1059.001 – PowerShell
+- T1027 – Obfuscated Files or Information
+- T1105 – Ingress Tool Transfer
+- T1071.001 – Web Protocols
+- T1204.002 – Malicious File
 
-## Detection Conversion
+## Investigation Steps
 
-The first query, with an allowlist of known admin hosts and tools, was turned into a scheduled Sentinel analytics rule that alerts on encoded or hidden PowerShell on standard workstations. A second rule alerts when Office applications launch PowerShell.
+1. Identify the affected device and user account.
+2. Review PowerShell command-line arguments.
+3. Investigate the parent process and process tree.
+4. Identify external IP addresses and domains contacted.
+5. Check downloaded files, hashes, and network activity.
+6. Correlate findings with EDR alerts and other endpoint events.
+7. Determine whether the activity is legitimate or malicious.
 
-## Lessons Learned
+## False Positives20.
 
-Encoded commands alone are not enough to call something malicious, because management tools use them too. The signals that matter most are the parent process, the host type and the decoded content. Recommend enabling script block logging so decoded content is available, and using Constrained Language Mode on standard workstations.
+- Authorized PowerShell automation.
+- IT administration scripts.
+- Software installation and updates.
+- Monitoring and configuration management tools.
+- Approved external API connections.
 
-## Portfolio Note
+## Response Actions
 
-This is a simulated hunt. Replace the findings with verified results from your lab before presenting it as a completed hunt.
+- Isolate the endpoint if compromise is confirmed.
+- Terminate malicious processes.
+- Block confirmed malicious IP addresses and domains.
+- Remove malicious scripts and payloads.
+- Reset compromised credentials if necessary.
+- Escalate according to SOC incident response procedures.
+
+## Hunting Conclusion
+
+Document the PowerShell commands, parent process, external connections, affected devices, investigation evidence, and final findings.
+
+Possible outcomes:
+
+- No suspicious activity found.
+- Benign administrative activity.
+- Suspicious activity requiring further investigation.
+- Confirmed malicious activity.
